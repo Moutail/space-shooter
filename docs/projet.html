@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Projets de Cherif Chaoussi</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
+
+        :root {
+            --primary-color: #00ff9f;
+            --secondary-color: #ff6b6b;
+            --background-color: #1a1a2e;
+            --card-color: #0f3460;
+            --text-color: #e3e3e3;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        header {
+            background-color: #16213e;
+            color: var(--primary-color);
+            text-align: center;
+            padding: 3rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, #16213e, #0f3460);
+            transform: skewY(-5deg);
+            transform-origin: top left;
+            z-index: -1;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 3rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 3rem 2rem;
+        }
+
+        .projects {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .project-card {
+            background-color: var(--card-color);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .project-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.3);
+        }
+
+        .project-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+
+        .project-card:hover .project-image {
+            transform: scale(1.1);
+        }
+
+        .project-info {
+            padding: 1.5rem;
+        }
+
+        .project-title {
+            color: var(--primary-color);
+            margin-top: 0;
+            font-size: 1.5rem;
+        }
+
+        .project-description {
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .project-link {
+            display: inline-block;
+            background-color: var(--primary-color);
+            color: var(--background-color);
+            text-decoration: none;
+            padding: 0.7rem 1.5rem;
+            border-radius: 25px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .project-link:hover {
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(255,107,107,0.4);
+        }
+
+        @media (max-width: 768px) {
+            .projects {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Projets de Cherif Chaoussi</h1>
+    </header>
+    <main class="container">
+        <section class="projects">
+            <article class="project-card">
+                <img src="galaxy.png" alt="Space Shooter" class="project-image">
+                <div class="project-info">
+                    <h2 class="project-title">Space Shooter</h2>
+                    <p class="project-description">Un jeu de tir spatial immersif contrôlé par les mouvements de la main ou le toucher sur mobile. Affrontez des ennemis, évitez les astéroïdes et sauvez la galaxie !</p>
+                    <a href="Game.html" class="project-link">Jouer</a>
+                </div>
+            </article>
+
+            <article class="project-card">
+                <img src="holographi.png" alt="Interface Holographique" class="project-image">
+                <div class="project-info">
+                    <h2 class="project-title">Interface Holographique</h2>
+                    <p class="project-description">Une interface futuriste inspirée de Tony Stark, contrôlée par les mouvements de la main. Interagissez avec des éléments holographiques en temps réel.</p>
+                    <a href="holographic-interface.html" class="project-link">Explorer</a>
+                </div>
+            </article>
+
+            <article class="project-card">
+                <img src="quantique.png" alt="Portail Interdimensionnel" class="project-image">
+                <div class="project-info">
+                    <h2 class="project-title">Portail Interdimensionnel</h2>
+                    <p class="project-description">Ouvrez un portail vers d'autres dimensions avec vos mains ! Une expérience visuelle fascinante mêlant physique quantique et design créatif.</p>
+                    <a href="interdimensional-portal.html" class="project-link">Ouvrir le portail</a>
+                </div>
+            </article>
+
+            <article class="project-card">
+                <img src="stark.png" alt="Contrôle d'Élément par la Main" class="project-image">
+                <div class="project-info">
+                    <h2 class="project-title">Contrôle d'Élément par la Main</h2>
+                    <p class="project-description">Manipulez un élément virtuel avec fluidité grâce aux mouvements de votre main. Une démonstration captivante de l'interaction homme-machine.</p>
+                    <a href="hand-controlled-element.html" class="project-link">Essayer</a>
+                </div>
+            </article>
+
+            <article class="project-card">
+                <img src="particle.png" alt="Effet de Particules Interactif" class="project-image">
+                <div class="project-info">
+                    <h2 class="project-title">Effet de Particules Interactif</h2>
+                    <p class="project-description">Créez et manipulez des effets de particules éblouissants avec vos mains. Une expérience visuelle immersive et réactive.</p>
+                    <a href="particle-effect.html" class="project-link">Jouer avec les particules</a>
+                </div>
+            </article>
+
+            <article class="project-card">
+                <img src="shooterv1.png" alt="Space Shooter v1" class="project-image">
+                <div class="project-info">
+                    <h2 class="project-title">Space Shooter v1</h2>
+                    <p class="project-description">Découvrez la première version de notre jeu Space Shooter. Avec moins d'éléments mais une fluidité optimale, cette version offre une expérience de jeu rapide et réactive. Pilotez votre vaisseau avec les mouvements de votre main et affrontez les premiers défis de l'espace !</p>
+                    <a href="space-shooter-v1.html" class="project-link">Jouer</a>
+                </div>
+            </article>
+        </section>
+    </main>
+    <script>
+        // Animation subtile pour les cartes de projet
+        document.querySelectorAll('.project-card').forEach(card => {
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                card.style.setProperty('--mouse-x', `${x}px`);
+                card.style.setProperty('--mouse-y', `${y}px`);
+            });
+        });
+    </script>
+</body>
+</html>

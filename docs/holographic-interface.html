@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Holographique avec contrôle par la main - Version corrigée</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #000;
+            overflow: hidden;
+        }
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        #video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            opacity: 0;
+        }
+    </style>
+</head>
+<body>
+    <video id="video" width="640" height="480" autoplay></video>
+    <canvas id="canvas"></canvas>
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        // Constantes pour le comportement des particules
+        const PARTICLE_COUNT = 3000;
+        const MAX_PARTICLE_SPEED = 5;
+        const BASE_HAND_INFLUENCE_RADIUS = 200;
+        const PARTICLE_REPULSION_RADIUS = 30;
+        const EDGE_BUFFER = 50;
+        
+        const particles = [];
+        let handPosition = { x: canvas.width / 2, y: canvas.height / 2 };
+        let lastHandPosition = { x: canvas.width / 2, y: canvas.height / 2 };
+        let handVelocity = { x: 0, y: 0 };
+        let handInfluenceRadius = BASE_HAND_INFLUENCE_RADIUS;
+        
+        class Particle {
+            constructor() {
+                this.reset();
+            }
+        
+            reset() {
+                this.x = Math.random() * (canvas.width - 2 * EDGE_BUFFER) + EDGE_BUFFER;
+                this.y = Math.random() * (canvas.height - 2 * EDGE_BUFFER) + EDGE_BUFFER;
+                this.z = Math.random() * 1000;
+                this.size = Math.random() * 2 + 0.5;
+                this.color = `rgba(0, 255, 255, ${Math.random() * 0.5 + 0.5})`;
+                this.vx = (Math.random() - 0.5) * 2;
+                this.vy = (Math.random() - 0.5) * 2;
+            }
+        
+            move() {
+                // Appliquez l'influence de la main
+                const dx = this.x - handPosition.x;
+                const dy = this.y - handPosition.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+        
+                if (distance < handInfluenceRadius) {
+                    const force = (handInfluenceRadius - distance) / handInfluenceRadius;
+                    this.vx += handVelocity.x * force * 0.1;
+                    this.vy += handVelocity.y * force * 0.1;
+                }
+        
+                // Limitez la vitesse maximale
+                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                if (speed > MAX_PARTICLE_SPEED) {
+                    this.vx = (this.vx / speed) * MAX_PARTICLE_SPEED;
+                    this.vy = (this.vy / speed) * MAX_PARTICLE_SPEED;
+                }
+        
+                // Mettez à jour la position
+                this.x += this.vx;
+                this.y += this.vy;
+        
+                // Gérez les collisions avec les bords
+                if (this.x < EDGE_BUFFER || this.x > canvas.width - EDGE_BUFFER) {
+                    this.vx *= -0.5;
+                    this.x = Math.max(EDGE_BUFFER, Math.min(this.x, canvas.width - EDGE_BUFFER));
+                }
+                if (this.y < EDGE_BUFFER || this.y > canvas.height - EDGE_BUFFER) {
+                    this.vy *= -0.5;
+                    this.y = Math.max(EDGE_BUFFER, Math.min(this.y, canvas.height - EDGE_BUFFER));
+                }
+        
+                // Dessinez la particule
+                let scale = 1000 / (this.z + 1);
+                let x2d = (this.x - canvas.width / 2) * scale + canvas.width / 2;
+                let y2d = (this.y - canvas.height / 2) * scale + canvas.height / 2;
+        
+                if (x2d > 0 && x2d < canvas.width && y2d > 0 && y2d < canvas.height) {
+                    ctx.fillStyle = this.color;
+                    ctx.beginPath();
+                    ctx.arc(x2d, y2d, this.size * scale, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+        
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+            particles.push(new Particle());
+        }
+        
+        function onResults(results) {
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const hand = results.multiHandLandmarks[0];
+                const palmBase = hand[0];
+                const middleFinger = hand[9];
+        
+                lastHandPosition = { ...handPosition };
+                handPosition = {
+                    x: (1 - palmBase.x) * canvas.width,
+                    y: palmBase.y * canvas.height
+                };
+        
+                // Calculez la vélocité de la main avec lissage
+                handVelocity = {
+                    x: (handPosition.x - lastHandPosition.x) * 0.5 + handVelocity.x * 0.5,
+                    y: (handPosition.y - lastHandPosition.y) * 0.5 + handVelocity.y * 0.5
+                };
+        
+                // Utilisez la distance entre la base de la paume et le bout du majeur pour estimer la profondeur
+                const depth = Math.sqrt(
+                    Math.pow(palmBase.x - middleFinger.x, 2) +
+                    Math.pow(palmBase.y - middleFinger.y, 2) +
+                    Math.pow(palmBase.z - middleFinger.z, 2)
+                );
+        
+                // Ajustez l'influence de la main en fonction de la profondeur
+                handInfluenceRadius = BASE_HAND_INFLUENCE_RADIUS + depth * 300; // Ajustez ces valeurs selon vos besoins
+            } else {
+                // Réduisez progressivement la vélocité si aucune main n'est détectée
+                handVelocity.x *= 0.95;
+                handVelocity.y *= 0.95;
+            }
+        }
+        
+        const hands = new Hands({locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+        }});
+        
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+        
+        hands.onResults(onResults);
+        
+        const camera = new Camera(video, {
+            onFrame: async () => {
+                await hands.send({image: video});
+            },
+            width: 640,
+            height: 480
+        });
+        camera.start();
+        
+        function applyParticleRepulsion() {
+            for (let i = 0; i < particles.length; i++) {
+                for (let j = i + 1; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+        
+                    if (distance < PARTICLE_REPULSION_RADIUS) {
+                        const force = (PARTICLE_REPULSION_RADIUS - distance) / PARTICLE_REPULSION_RADIUS;
+                        const repulsionX = dx / distance * force * 0.05;
+                        const repulsionY = dy / distance * force * 0.05;
+        
+                        particles[i].vx += repulsionX;
+                        particles[i].vy += repulsionY;
+                        particles[j].vx -= repulsionX;
+                        particles[j].vy -= repulsionY;
+                    }
+                }
+            }
+        }
+        
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            applyParticleRepulsion();
+            particles.forEach(particle => particle.move());
+            requestAnimationFrame(animate);
+        }
+        
+        animate();
+        
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+</body>
+</html>

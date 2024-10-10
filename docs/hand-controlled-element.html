@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interface holographique style Tony Stark</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #000;
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+        }
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        #video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            opacity: 0;
+        }
+    </style>
+</head>
+<body>
+    <video id="video" width="640" height="480" autoplay></video>
+    <canvas id="canvas"></canvas>
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        let handPosition = { x: canvas.width / 2, y: canvas.height / 2 };
+        let targetPosition = { x: canvas.width / 2, y: canvas.height / 2 };
+        const lerpFactor = 0.1;
+        
+        const interfaceElements = [];
+        const particles = [];
+        
+        class InterfaceElement {
+            constructor(x, y, radius, label) {
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.label = label;
+                this.active = false;
+                this.hoverTime = 0;
+            }
+            
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = this.active ? 'rgba(0, 255, 255, 0.8)' : 'rgba(0, 255, 255, 0.4)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                if (this.active) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius * 0.8, 0, Math.PI * 2);
+                    const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius);
+                    gradient.addColorStop(0, 'rgba(0, 255, 255, 0.2)');
+                    gradient.addColorStop(1, 'rgba(0, 255, 255, 0)');
+                    ctx.fillStyle = gradient;
+                    ctx.fill();
+                }
+                
+                ctx.fillStyle = 'rgba(0, 255, 255, 0.8)';
+                ctx.font = '14px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(this.label, this.x, this.y + this.radius + 20);
+                
+                if (this.hoverTime > 0) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, -Math.PI / 2, (this.hoverTime / 50) * Math.PI * 2 - Math.PI / 2);
+                    ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+                }
+            }
+            
+            update(handX, handY) {
+                const distance = Math.sqrt((handX - this.x) ** 2 + (handY - this.y) ** 2);
+                if (distance < this.radius) {
+                    this.hoverTime++;
+                    if (this.hoverTime >= 50) {
+                        this.active = !this.active;
+                        this.hoverTime = 0;
+                    }
+                } else {
+                    this.hoverTime = 0;
+                }
+            }
+        }
+        
+        class Particle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.size = Math.random() * 3 + 1;
+                this.speedX = Math.random() * 3 - 1.5;
+                this.speedY = Math.random() * 3 - 1.5;
+                this.color = `rgba(0, 255, 255, ${Math.random() * 0.5 + 0.5})`;
+            }
+            
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                if (this.size > 0.2) this.size -= 0.1;
+            }
+            
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        function createInterfaceElements() {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = Math.min(canvas.width, canvas.height) * 0.2;
+            
+            for (let i = 0; i < 5; i++) {
+                const angle = (i / 5) * Math.PI * 2 - Math.PI / 2;
+                const x = centerX + Math.cos(angle) * radius;
+                const y = centerY + Math.sin(angle) * radius;
+                interfaceElements.push(new InterfaceElement(x, y, 40, `Module ${i + 1}`));
+            }
+        }
+        
+        function drawDataDisplay() {
+            ctx.fillStyle = 'rgba(0, 255, 255, 0.1)';
+            ctx.fillRect(20, 20, 250, 150);
+            
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.5)';
+            ctx.strokeRect(20, 20, 250, 150);
+            
+            ctx.fillStyle = 'rgba(0, 255, 255, 0.8)';
+            ctx.font = '16px Arial';
+            ctx.fillText('System Status: Online', 30, 50);
+            ctx.fillText(`Hand Position: (${Math.round(handPosition.x)}, ${Math.round(handPosition.y)})`, 30, 80);
+            ctx.fillText(`Active Modules: ${interfaceElements.filter(e => e.active).length}`, 30, 110);
+            
+            const date = new Date();
+            ctx.fillText(`Time: ${date.toLocaleTimeString()}`, 30, 140);
+        }
+        
+        function lerp(start, end, t) {
+            return start * (1 - t) + end * t;
+        }
+        
+        function updateHandPosition() {
+            handPosition.x = lerp(handPosition.x, targetPosition.x, lerpFactor);
+            handPosition.y = lerp(handPosition.y, targetPosition.y, lerpFactor);
+            
+            for (let i = 0; i < 2; i++) {
+                particles.push(new Particle(handPosition.x, handPosition.y));
+            }
+            
+            if (particles.length > 100) {
+                particles.splice(0, 2);
+            }
+        }
+        
+        function drawHand() {
+            ctx.beginPath();
+            ctx.arc(handPosition.x, handPosition.y, 20, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 255, 255, 0.3)';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+        
+        function onResults(results) {
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const hand = results.multiHandLandmarks[0];
+                const palmBase = hand[0];
+                
+                targetPosition = {
+                    x: (1 - palmBase.x) * canvas.width,
+                    y: palmBase.y * canvas.height
+                };
+            }
+        }
+        
+        function animate() {
+            ctx.fillStyle = 'rgba(0, 0, 20, 0.2)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            updateHandPosition();
+            
+            interfaceElements.forEach(element => {
+                element.update(handPosition.x, handPosition.y);
+                element.draw();
+            });
+            
+            particles.forEach((particle, index) => {
+                particle.update();
+                particle.draw();
+                if (particle.size <= 0.2) {
+                    particles.splice(index, 1);
+                }
+            });
+            
+            drawDataDisplay();
+            drawHand();
+            
+            requestAnimationFrame(animate);
+        }
+        
+        const hands = new Hands({locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+        }});
+        
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+        
+        hands.onResults(onResults);
+        
+        const camera = new Camera(video, {
+            onFrame: async () => {
+                await hands.send({image: video});
+            },
+            width: 640,
+            height: 480
+        });
+        camera.start();
+        
+        createInterfaceElements();
+        animate();
+        
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            createInterfaceElements();
+        });
+    </script>
+</body>
+</html>

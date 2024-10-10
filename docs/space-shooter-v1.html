@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Shooter - Contrôle par la main ou tactile</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #000;
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+        }
+        #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        #video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            opacity: 0;
+        }
+        #startButton {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2;
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: rgba(0, 255, 255, 0.5);
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #startButton:hover {
+            background-color: rgba(0, 255, 255, 0.8);
+        }
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 14px;
+            text-align: center;
+            z-index: 2;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <video id="video" width="640" height="480" autoplay></video>
+    <canvas id="gameCanvas"></canvas>
+    <button id="startButton">Démarrer le jeu</button>
+    <div id="instructions">Utilisez votre main pour déplacer le vaisseau</div>
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const startButton = document.getElementById('startButton');
+        const instructions = document.getElementById('instructions');
+        
+        let isStarted = false;
+        let gameScale = 1;
+        let isTouchDevice = 'ontouchstart' in window;
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        let shipPosition = { x: canvas.width / 2, y: canvas.height - 100 };
+        let targetPosition = { x: canvas.width / 2, y: canvas.height - 100 };
+        const lerpFactor = 0.1;
+        
+        let score = 0;
+        let lives = 3;
+        let gameOver = false;
+        
+        const bullets = [];
+        const asteroids = [];
+        const enemies = [];
+        const particles = [];
+        
+        class GameObject {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+            }
+        
+            update() {}
+            draw() {}
+        }
+        
+        class Bullet extends GameObject {
+            constructor(x, y) {
+                super(x, y);
+                this.speed = 10 * gameScale;
+                this.radius = 3 * gameScale;
+            }
+            
+            update() {
+                this.y -= this.speed;
+            }
+            
+            draw() {
+                ctx.fillStyle = 'yellow';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        class Asteroid extends GameObject {
+            constructor() {
+                super(Math.random() * canvas.width, -50 * gameScale);
+                this.speed = (Math.random() * 2 + 1) * gameScale;
+                this.radius = (Math.random() * 20 + 10) * gameScale;
+            }
+            
+            update() {
+                this.y += this.speed;
+            }
+            
+            draw() {
+                ctx.fillStyle = 'gray';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        class Enemy extends GameObject {
+            constructor() {
+                super(Math.random() * canvas.width, -50 * gameScale);
+                this.speed = (Math.random() * 1.5 + 0.5) * gameScale;
+                this.width = 40 * gameScale;
+                this.height = 40 * gameScale;
+            }
+            
+            update() {
+                this.y += this.speed;
+            }
+            
+            draw() {
+                ctx.fillStyle = 'red';
+                ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
+            }
+        }
+        
+        class Particle extends GameObject {
+            constructor(x, y, color) {
+                super(x, y);
+                this.size = (Math.random() * 3 + 1) * gameScale;
+                this.speedX = (Math.random() * 3 - 1.5) * gameScale;
+                this.speedY = (Math.random() * 3 - 1.5) * gameScale;
+                this.color = color;
+                this.life = 30;
+            }
+            
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.life--;
+            }
+            
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        function lerp(start, end, t) {
+            return start * (1 - t) + end * t;
+        }
+        
+        function updateShipPosition() {
+            shipPosition.x = lerp(shipPosition.x, targetPosition.x, lerpFactor);
+            shipPosition.y = lerp(shipPosition.y, targetPosition.y, lerpFactor);
+        }
+        
+        function drawShip() {
+            ctx.fillStyle = 'cyan';
+            ctx.beginPath();
+            ctx.moveTo(shipPosition.x, shipPosition.y - 20 * gameScale);
+            ctx.lineTo(shipPosition.x - 15 * gameScale, shipPosition.y + 10 * gameScale);
+            ctx.lineTo(shipPosition.x + 15 * gameScale, shipPosition.y + 10 * gameScale);
+            ctx.closePath();
+            ctx.fill();
+        }
+        
+        function shootBullet() {
+            bullets.push(new Bullet(shipPosition.x, shipPosition.y - 20 * gameScale));
+        }
+        
+        function spawnAsteroid() {
+            if (Math.random() < 0.02) {
+                asteroids.push(new Asteroid());
+            }
+        }
+        
+        function spawnEnemy() {
+            if (Math.random() < 0.005) {
+                enemies.push(new Enemy());
+            }
+        }
+        
+        function checkCollisions() {
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                for (let j = asteroids.length - 1; j >= 0; j--) {
+                    const dx = bullets[i].x - asteroids[j].x;
+                    const dy = bullets[i].y - asteroids[j].y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < bullets[i].radius + asteroids[j].radius) {
+                        createExplosion(asteroids[j].x, asteroids[j].y, 'gray');
+                        bullets.splice(i, 1);
+                        asteroids.splice(j, 1);
+                        score += 10;
+                        break;
+                    }
+                }
+            }
+            
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    if (bullets[i].x > enemies[j].x - enemies[j].width / 2 &&
+                        bullets[i].x < enemies[j].x + enemies[j].width / 2 &&
+                        bullets[i].y > enemies[j].y - enemies[j].height / 2 &&
+                        bullets[i].y < enemies[j].y + enemies[j].height / 2) {
+                        createExplosion(enemies[j].x, enemies[j].y, 'red');
+                        bullets.splice(i, 1);
+                        enemies.splice(j, 1);
+                        score += 20;
+                        break;
+                    }
+                }
+            }
+            
+            for (let i = asteroids.length - 1; i >= 0; i--) {
+                const dx = shipPosition.x - asteroids[i].x;
+                const dy = shipPosition.y - asteroids[i].y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < asteroids[i].radius + 20 * gameScale) {
+                    createExplosion(shipPosition.x, shipPosition.y, 'cyan');
+                    asteroids.splice(i, 1);
+                    lives--;
+                    if (lives <= 0) gameOver = true;
+                }
+            }
+            
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                if (shipPosition.x > enemies[i].x - enemies[i].width / 2 &&
+                    shipPosition.x < enemies[i].x + enemies[i].width / 2 &&
+                    shipPosition.y > enemies[i].y - enemies[i].height / 2 &&
+                    shipPosition.y < enemies[i].y + enemies[i].height / 2) {
+                    createExplosion(shipPosition.x, shipPosition.y, 'cyan');
+                    enemies.splice(i, 1);
+                    lives--;
+                    if (lives <= 0) gameOver = true;
+                }
+            }
+        }
+        
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 20; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+        
+        function drawUI() {
+            ctx.fillStyle = 'white';
+            ctx.font = `${20 * gameScale}px Arial`;
+            ctx.fillText(`Score: ${score}`, 20 * gameScale, 30 * gameScale);
+            ctx.fillText(`Vies: ${lives}`, 20 * gameScale, 60 * gameScale);
+            
+            if (gameOver) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'white';
+                ctx.font = `${40 * gameScale}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2);
+                ctx.font = `${20 * gameScale}px Arial`;
+                ctx.fillText(`Score final: ${score}`, canvas.width / 2, canvas.height / 2 + 40 * gameScale);
+                ctx.fillText(isTouchDevice ? 'Touchez pour recommencer' : 'Levez la main pour recommencer', canvas.width / 2, canvas.height / 2 + 80 * gameScale);
+            }
+        }
+        
+        function resetGame() {
+            score = 0;
+            lives = 3;
+            gameOver = false;
+            bullets.length = 0;
+            asteroids.length = 0;
+            enemies.length = 0;
+            particles.length = 0;
+            shipPosition = { x: canvas.width / 2, y: canvas.height - 100 * gameScale };
+            targetPosition = { x: canvas.width / 2, y: canvas.height - 100 * gameScale };
+        }
+        
+        function onResults(results) {
+            if (!isTouchDevice && results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const hand = results.multiHandLandmarks[0];
+                const palmBase = hand[0];
+                
+                targetPosition = {
+                    x: (1 - palmBase.x) * canvas.width,
+                    y: palmBase.y * canvas.height
+                };
+                
+                if (gameOver && palmBase.y < 0.3) {
+                    resetGame();
+                }
+            }
+        }
+        
+        function resizeGame() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            gameScale = Math.min(canvas.width / 1920, canvas.height / 1080);
+            shipPosition = { x: canvas.width / 2, y: canvas.height - 100 * gameScale };
+            targetPosition = { x: canvas.width / 2, y: canvas.height - 100 * gameScale };
+        }
+
+        function touchHandler(e) {
+            if (!isStarted) return;
+            e.preventDefault();
+            targetPosition = {
+                x: e.touches[0].clientX,
+                y: e.touches[0].clientY
+            };
+            if (gameOver) {
+                resetGame();
+            }
+        }
+
+        function drawBackground() {
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#000033');
+            gradient.addColorStop(1, '#000011');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = 'white';
+            for (let i = 0; i < 100; i++) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const size = Math.random() * 2 * gameScale;
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function gameLoop() {
+            if (!isStarted) return;
+
+            drawBackground();
+            
+            if (!gameOver) {
+                updateShipPosition();
+                spawnAsteroid();
+                spawnEnemy();
+                
+                bullets.forEach((bullet, index) => {
+                    bullet.update();
+                    bullet.draw();
+                    if (bullet.y < 0) bullets.splice(index, 1);
+                });
+                
+                asteroids.forEach((asteroid, index) => {
+                    asteroid.update();
+                    asteroid.draw();
+                    if (asteroid.y > canvas.height + asteroid.radius) asteroids.splice(index, 1);
+                });
+                
+                enemies.forEach((enemy, index) => {
+                    enemy.update();
+                    enemy.draw();
+                    if (enemy.y > canvas.height + enemy.height / 2) enemies.splice(index, 1);
+                });
+                
+                particles.forEach((particle, index) => {
+                    particle.update();
+                    particle.draw();
+                    if (particle.life <= 0) particles.splice(index, 1);
+                });
+                
+                checkCollisions();
+                drawShip();
+                
+                if (Math.random() < 0.1) shootBullet();
+            }
+            
+            drawUI();
+            requestAnimationFrame(gameLoop);
+        }
+
+        const hands = new Hands({locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+        }});
+        
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+        
+        hands.onResults(onResults);
+        
+        const camera = new Camera(video, {
+            onFrame: async () => {
+                await hands.send({image: video});
+            },
+            width: 640,
+            height: 480
+        });
+
+        window.addEventListener('resize', resizeGame);
+        canvas.addEventListener('touchmove', touchHandler);
+        canvas.addEventListener('touchstart', touchHandler);
+
+        startButton.addEventListener('click', () => {
+            if (!isStarted) {
+                isStarted = true;
+                if (!isTouchDevice) {
+                    camera.start();
+                }
+                gameLoop();
+                startButton.style.display = 'none';
+                instructions.style.display = 'block';
+                if (isTouchDevice) {
+                    instructions.textContent = 'Touchez et déplacez pour contrôler le vaisseau';
+                }
+            }
+        });
+
+        resizeGame();
+    </script>
+</body>
+</html>

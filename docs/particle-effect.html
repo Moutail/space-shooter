@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Holographique avec contrôle par la main - Mouvements corrigés</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #000;
+            overflow: hidden;
+        }
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        #video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            opacity: 0;
+        }
+    </style>
+</head>
+<body>
+    <video id="video" width="640" height="480" autoplay></video>
+    <canvas id="canvas"></canvas>
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        const particles = [];
+        const particleCount = 5000;
+        let handPosition = { x: canvas.width / 2, y: canvas.height / 2 };
+        let lastHandPosition = { x: canvas.width / 2, y: canvas.height / 2 };
+        let handVelocity = { x: 0, y: 0 };
+        
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.z = Math.random() * 1000;
+                this.size = Math.random() * 2 + 0.5;
+                this.color = `rgba(0, 255, 255, ${Math.random() * 0.5 + 0.5})`;
+                this.vx = 0;
+                this.vy = 0;
+            }
+            
+            move() {
+                this.z -= 1;
+                if (this.z <= 0) {
+                    this.z = 1000;
+                }
+                
+                // Ajuster la vélocité des particules en fonction du mouvement de la main
+                let targetVx = handVelocity.x * 0.5;
+                let targetVy = handVelocity.y * 0.5;
+                
+                // Interpolation de la vélocité pour un mouvement plus fluide
+                this.vx += (targetVx - this.vx) * 0.1;
+                this.vy += (targetVy - this.vy) * 0.1;
+                
+                this.x += this.vx;
+                this.y += this.vy;
+                
+                // Garder les particules dans les limites du canvas avec un effet de rebond
+                if (this.x < 0) { this.x = 0; this.vx *= -0.5; }
+                if (this.x > canvas.width) { this.x = canvas.width; this.vx *= -0.5; }
+                if (this.y < 0) { this.y = 0; this.vy *= -0.5; }
+                if (this.y > canvas.height) { this.y = canvas.height; this.vy *= -0.5; }
+                
+                let scale = 1000 / (this.z + 1);  // Éviter la division par zéro
+                let x2d = (this.x - canvas.width / 2) * scale + canvas.width / 2;
+                let y2d = (this.y - canvas.height / 2) * scale + canvas.height / 2;
+                
+                if (x2d > 0 && x2d < canvas.width && y2d > 0 && y2d < canvas.height) {
+                    ctx.fillStyle = this.color;
+                    ctx.beginPath();
+                    ctx.arc(x2d, y2d, this.size * scale, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+        
+        for (let i = 0; i < particleCount; i++) {
+            particles.push(new Particle());
+        }
+        
+        function onResults(results) {
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const hand = results.multiHandLandmarks[0];
+                const palmBase = hand[0];
+                lastHandPosition = { ...handPosition };
+                handPosition = {
+                    x: (1 - palmBase.x) * canvas.width, // Inversion de la coordonnée x
+                    y: palmBase.y * canvas.height
+                };
+                
+                // Calculer la vélocité de la main
+                handVelocity = {
+                    x: handPosition.x - lastHandPosition.x,
+                    y: handPosition.y - lastHandPosition.y
+                };
+            } else {
+                // Réduire progressivement la vélocité si aucune main n'est détectée
+                handVelocity.x *= 0.95;
+                handVelocity.y *= 0.95;
+            }
+        }
+        
+        const hands = new Hands({locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+        }});
+        
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+        
+        hands.onResults(onResults);
+        
+        const camera = new Camera(video, {
+            onFrame: async () => {
+                await hands.send({image: video});
+            },
+            width: 640,
+            height: 480
+        });
+        camera.start();
+        
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(particle => particle.move());
+            requestAnimationFrame(animate);
+        }
+        
+        animate();
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+</body>
+</html>
