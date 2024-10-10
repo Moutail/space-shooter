@@ -91,6 +91,12 @@
     </style>
 </head>
 <body>
+    <div id="instructionScreen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.8); color: #00ffff; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; text-align: center;">
+        <h1>Instructions</h1>
+        <p>Utilisez votre main devant la caméra pour déplacer le vaisseau.</p>
+        <p>Pour les utilisateurs sur mobile, veuillez désactiver la rotation automatique de l'écran pour une meilleure expérience.</p>
+        <button id="startButton" style="padding: 10px 20px; font-size: 18px; background-color: #00ffff; color: #000; border: none; cursor: pointer; margin-top: 20px;">Commencer le jeu</button>
+    </div>
     <div id="loadingScreen">
         <h1 style="color: #00ffff;">Chargement...</h1>
         <div id="loadingBar"><div id="loadingProgress"></div></div>
@@ -100,7 +106,7 @@
     <div id="signature">
         Créé par Chaoussi Cherif
         <div id="logo">
-            <img src="logo.jpg" alt="Skynet Logo">
+            <img src="./logo/logo.jpg" alt="Skynet Logo">
         </div>
     </div>
     <script>
@@ -155,9 +161,9 @@
         }
 
         // Chargement asynchrone des sons
-        const shootSoundPromise = loadSound('shoot.mp3');
-        const explosionSoundPromise = loadSound('explosion.mp3');
-        const powerUpSoundPromise = loadSound('powerup.mp3');
+        const shootSoundPromise = loadSound('./audiosPlays/shoot.mp3');
+        const explosionSoundPromise = loadSound('./audiosPlays/explosion.mp3');
+        const powerUpSoundPromise = loadSound('./audiosPlays/powerup.mp3');
 
         // Simulation du chargement d'autres assets
         setTimeout(updateLoadingProgress, 1000);
@@ -730,6 +736,7 @@
         }
         
         function startGame() {
+            document.getElementById('instructionScreen').style.display = 'none';
             createStars();
             resetGame();
             gameLoop();
@@ -842,6 +849,12 @@
         window.addEventListener('load', () => {
             init();
             // Le jeu démarrera automatiquement une fois que tous les assets seront chargés
+        });
+
+        document.getElementById('startButton').addEventListener('click', () => {
+            document.getElementById('instructionScreen').style.display = 'none';
+            document.getElementById('loadingScreen').style.display = 'flex';
+            init();
         });
 
     </script>
